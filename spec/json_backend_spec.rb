@@ -15,6 +15,7 @@ class Hiera
         describe Json_backend do
             before do
                 Hiera.stubs(:warn)
+                Hiera.stubs(:debug)
                 Backend.stubs(:parse_string)
                 Backend.stubs(:datasources).yields([])
 
