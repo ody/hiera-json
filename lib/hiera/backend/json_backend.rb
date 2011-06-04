@@ -7,10 +7,10 @@ class Hiera
                 Hiera.warn("JSON Starting")
             end
 
-            def lookup(key, default, scope, order_override=nil)
+            def lookup(key, scope, order_override=nil)
                 answer = nil
 
-                Hiera.warn("Looking up #{key} with default #{default} in JSON backup")
+                Hiera.warn("Looking up #{key} in JSON backup")
 
                 datadir = Backend.datadir(:json, scope)
 
@@ -42,7 +42,7 @@ class Hiera
                     end
                 end
 
-                answer || default or raise(NoDataFound, "No match found for '#{key}' in any data file during hiera lookup")
+                answer
             end
         end
     end
