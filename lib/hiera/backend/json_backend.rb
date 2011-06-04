@@ -19,10 +19,10 @@ class Hiera
             def initialize
                 require 'json'
 
-                Hiera.debug("JSON Starting")
+                Hiera.debug("Hiera JSON backend starting")
             end
 
-            def lookup(key, scope, order_override=nil)
+            def lookup(key, scope, order_override, resolution_type)
                 answer = nil
 
                 Hiera.debug("Looking up #{key} in JSON backup")
@@ -33,7 +33,7 @@ class Hiera
 
                 Backend.datasources(scope, order_override) do |source|
                     unless answer
-                        Hiera.warn("Looking for data source #{source}")
+                        Hiera.debug("Looking for data source #{source}")
 
                         datafile = File.join([datadir, "#{source}.json"])
 
@@ -47,11 +47,7 @@ class Hiera
                         next if data.empty?
                         next unless data.include?(key)
 
-                        if data[key].is_a?(String)
-                            answer = Backend.parse_string(data[key], scope)
-                        else
-                            answer = data[key]
-                        end
+                        answer = Backend.parse_string(data[key], scope)
                     else
                         break
                     end

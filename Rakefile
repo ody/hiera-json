@@ -16,8 +16,8 @@ spec = Gem::Specification.new do |s|
   s.test_files = FileList["{test}/**/*test.rb"].to_a
   s.has_rdoc = true
   s.extra_rdoc_files = ["README.md"]
-  s.add_dependency('hiera')
-  s.add_dependency('json')
+  s.add_dependency 'hiera'
+  s.add_dependency 'json'
 end
 
 Rake::GemPackageTask.new(spec) do |pkg|
@@ -29,3 +29,5 @@ RSpec::Core::RakeTask.new(:test) do |t|
     t.pattern = 'spec/**/*_spec.rb'
     t.rspec_opts = File.read("spec/spec.opts").chomp || ""
 end
+
+task :default => [:test, :repackage]

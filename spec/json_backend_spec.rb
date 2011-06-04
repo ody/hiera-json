@@ -26,14 +26,14 @@ class Hiera
             it "should use the configured datadir" do
                 File.expects(:directory?).with("/nonexisting").returns(true)
 
-                @backend.lookup("test", {})
+                @backend.lookup("test", {}, nil, nil)
             end
 
             it "should fail for missing data directories" do
                 File.expects(:directory?).with("/nonexisting").returns(false)
 
                 expect {
-                    @backend.lookup("test", {})
+                    @backend.lookup("test", {}, nil, nil)
                 }.to raise_error("Cannot find data directory /nonexisting")
             end
 
@@ -42,7 +42,7 @@ class Hiera
                 Backend.expects(:datasources).with({}, nil).multiple_yields(["one"], ["two"])
                 File.expects(:exist?).with("/nonexisting/one.json")
                 File.expects(:exist?).with("/nonexisting/two.json")
-                @backend.lookup("test", {})
+                @backend.lookup("test", {}, nil, nil)
             end
 
             it "should warn about missing data files and continue" do
@@ -54,7 +54,7 @@ class Hiera
                 Hiera.expects(:warn).with("Cannot find datafile /nonexisting/one.json, skipping")
                 Hiera.expects(:warn).with("Cannot find datafile /nonexisting/two.json, skipping")
 
-                @backend.lookup("test", {})
+                @backend.lookup("test", {}, nil, nil)
             end
 
             it "should parse string data for interprolation" do
@@ -64,7 +64,7 @@ class Hiera
                 File.expects(:read).with("/nonexisting/one.json").returns('{"test":"data"}')
                 Backend.expects(:parse_string).with("data", {})
 
-                @backend.lookup("test", {})
+                @backend.lookup("test", {}, nil, nil)
             end
 
             it "should return the first answer found" do
@@ -77,7 +77,7 @@ class Hiera
                 File.expects(:exist?).with("/nonexisting/two.json").never
                 File.expects(:read).with("/nonexisting/two.json").never
 
-                @backend.lookup("test", {}).should == "data1"
+                @backend.lookup("test", {}, nil, nil).should == "data1"
             end
         end
     end
