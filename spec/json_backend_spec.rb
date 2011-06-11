@@ -2,9 +2,9 @@ $:.insert(0, File.join([File.dirname(__FILE__), "..", "lib"]))
 
 require 'rubygems'
 require 'rspec'
-require 'hiera/backend/json_backend'
 require 'rspec/mocks'
 require 'mocha'
+require 'hiera/backend/json_backend'
 
 RSpec.configure do |config|
     config.mock_with :mocha
@@ -14,70 +14,68 @@ class Hiera
     module Backend
         describe Json_backend do
             before do
-                Hiera.stubs(:warn)
                 Hiera.stubs(:debug)
-                Backend.stubs(:parse_string)
-                Backend.stubs(:datasources).yields([])
-
-                Backend.expects(:datadir).with(:json, {}).returns("/nonexisting")
+                Hiera.stubs(:warn)
+                Hiera::Backend.stubs(:empty_answer).returns(nil)
                 @backend = Json_backend.new
             end
 
-            it "should use the configured datadir" do
-                File.expects(:directory?).with("/nonexisting").returns(true)
-
-                @backend.lookup("test", {}, nil, nil)
+            describe "#initialize" do
+                it "should announce its creation" do # because other specs checks this
+                    Hiera.expects(:debug).with("Hiera JSON backend starting")
+                    Json_backend.new
+                end
             end
 
-            it "should fail for missing data directories" do
-                File.expects(:directory?).with("/nonexisting").returns(false)
+            describe "#lookup" do
+                it "should look for data in all sources" do
+                    Backend.expects(:datasources).multiple_yields(["one"], ["two"])
+                    Backend.expects(:datafile).with(:json, {}, "one", "json").returns(nil)
+                    Backend.expects(:datafile).with(:json, {}, "two", "json").returns(nil)
 
-                expect {
-                    @backend.lookup("test", {}, nil, nil)
-                }.to raise_error("Cannot find data directory /nonexisting")
-            end
+                    @backend.lookup("key", {}, nil, :priority)
+                end
 
-            it "should look for data in all data sources" do
-                File.expects(:directory?).with("/nonexisting").returns(true)
-                Backend.expects(:datasources).with({}, nil).multiple_yields(["one"], ["two"])
-                File.expects(:exist?).with("/nonexisting/one.json")
-                File.expects(:exist?).with("/nonexisting/two.json")
-                @backend.lookup("test", {}, nil, nil)
-            end
+                it "should pick data earliest source that has it for priority searches" do
+                    scope = {"rspec" => "test"}
+                    Backend.stubs(:parse_answer).with('answer', scope).returns("answer")
+                    Backend.stubs(:parse_answer).with('test_%{rspec}', scope).returns("test_test")
+                    Backend.expects(:datasources).multiple_yields(["one"], ["two"])
+                    Backend.expects(:datafile).with(:json, scope, "one", "json").returns("/nonexisting/one.json")
+                    Backend.expects(:datafile).with(:json, scope, "two", "json").returns(nil).never
+                    File.expects(:read).with("/nonexisting/one.json").returns("one.json")
+                    JSON.expects(:parse).with("one.json").returns({"key" => "test_%{rspec}"})
 
-            it "should warn about missing data files and continue" do
-                File.expects(:directory?).with("/nonexisting").returns(true)
-                Backend.expects(:datasources).with({}, nil).multiple_yields(["one"], ["two"])
-                File.expects(:exist?).with("/nonexisting/one.json").returns(false)
-                File.expects(:exist?).with("/nonexisting/two.json").returns(false)
+                    @backend.lookup("key", scope, nil, :priority).should == "test_test"
+                end
 
-                Hiera.expects(:warn).with("Cannot find datafile /nonexisting/one.json, skipping")
-                Hiera.expects(:warn).with("Cannot find datafile /nonexisting/two.json, skipping")
+                it "should build an array of all data sources for array searches" do
+                    Hiera::Backend.stubs(:empty_answer).returns([])
+                    Backend.stubs(:parse_answer).with('answer', {}).returns("answer")
+                    Backend.expects(:datafile).with(:json, {}, "one", "json").returns("/nonexisting/one.json")
+                    Backend.expects(:datafile).with(:json, {}, "two", "json").returns("/nonexisting/two.json")
 
-                @backend.lookup("test", {}, nil, nil)
-            end
+                    Backend.expects(:datasources).multiple_yields(["one"], ["two"])
 
-            it "should parse string data for interprolation" do
-                File.expects(:directory?).with("/nonexisting").returns(true)
-                Backend.expects(:datasources).with({}, nil).yields("one")
-                File.expects(:exist?).with("/nonexisting/one.json").returns(true)
-                File.expects(:read).with("/nonexisting/one.json").returns('{"test":"data"}')
-                Backend.expects(:parse_string).with("data", {})
+                    File.expects(:read).with("/nonexisting/one.json").returns("one.json")
+                    File.expects(:read).with("/nonexisting/two.json").returns("two.json")
 
-                @backend.lookup("test", {}, nil, nil)
-            end
+                    JSON.expects(:parse).with("one.json").returns({"key" => "answer"})
+                    JSON.expects(:parse).with("two.json").returns({"key" => "answer"})
 
-            it "should return the first answer found" do
-                File.expects(:directory?).with("/nonexisting").returns(true)
-                Backend.expects(:datasources).with({}, nil).multiple_yields(["one"], ["two"])
-                File.expects(:exist?).with("/nonexisting/one.json").returns(true)
-                File.expects(:read).with("/nonexisting/one.json").returns('{"test":"data1"}')
-                Backend.expects(:parse_string).with("data1", {}).returns("data1")
+                    @backend.lookup("key", {}, nil, :array).should == ["answer", "answer"]
+                end
 
-                File.expects(:exist?).with("/nonexisting/two.json").never
-                File.expects(:read).with("/nonexisting/two.json").never
+                it "should parse the answer for scope variables" do
+                    Backend.stubs(:parse_answer).with('test_%{rspec}', {'rspec' => 'test'}).returns("test_test")
+                    Backend.expects(:datasources).yields("one")
+                    Backend.expects(:datafile).with(:json, {"rspec" => "test"}, "one", "json").returns("/nonexisting/one.json")
 
-                @backend.lookup("test", {}, nil, nil).should == "data1"
+                    File.expects(:read).with("/nonexisting/one.json").returns("one.json")
+                    JSON.expects(:parse).with("one.json").returns({"key" => "test_%{rspec}"})
+
+                    @backend.lookup("key", {"rspec" => "test"}, nil, :priority).should == "test_test"
+                end
             end
         end
     end

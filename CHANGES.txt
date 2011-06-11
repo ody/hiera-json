@@ -1,0 +1,2 @@
+2011/06/11 - Add array search support and use new helper methods
+2011/06/07 - Change warn level messages when a datafile is missing to debug

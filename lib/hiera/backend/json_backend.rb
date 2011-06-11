@@ -1,18 +1,3 @@
-#
-#   Copyright 2010, 2011 R.I.Pienaar
-#
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
-#
-#       http://www.apache.org/licenses/LICENSE-2.0
-#
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-#
 class Hiera
     module Backend
         class Json_backend
@@ -23,37 +8,35 @@ class Hiera
             end
 
             def lookup(key, scope, order_override, resolution_type)
-                answer = nil
+                answer = Backend.empty_answer(resolution_type)
 
-                Hiera.debug("Looking up #{key} in JSON backup")
-
-                datadir = Backend.datadir(:json, scope)
-
-                raise "Cannot find data directory #{datadir}" unless File.directory?(datadir)
+                Hiera.debug("Looking up #{key} in JSON backend")
 
                 Backend.datasources(scope, order_override) do |source|
-                    unless answer
-                        Hiera.debug("Looking for data source #{source}")
+                    Hiera.debug("Looking for data source #{source}")
 
-                        datafile = File.join([datadir, "#{source}.json"])
+                    jsonfile = Backend.datafile(:json, scope, source, "json") || next
 
-                        unless File.exist?(datafile)
-                            Hiera.warn("Cannot find datafile #{datafile}, skipping")
-                            next
-                        end
+                    data = JSON.parse(File.read(jsonfile))
 
-                        data = JSON.parse(File.read(datafile))
+                    next if data.empty?
+                    next unless data.include?(key)
 
-                        next if data.empty?
-                        next unless data.include?(key)
-
-                        answer = Backend.parse_string(data[key], scope)
+                    # for array resolution we just append to the array whatever
+                    # we find, we then goes onto the next file and keep adding to
+                    # the array
+                    #
+                    # for priority searches we break after the first found data item
+                    case resolution_type
+                    when :array
+                        answer << Backend.parse_answer(data[key], scope)
                     else
+                        answer = Backend.parse_answer(data[key], scope)
                         break
                     end
                 end
 
-                answer
+                return answer
             end
         end
     end
